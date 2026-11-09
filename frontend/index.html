@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Outreach Desk — PS-3</title>
+  <!-- Set the theme before the first paint, so a reload never flashes the
+       wrong one at someone who chose light. -->
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('od-theme');
+        if (saved === 'light' || saved === 'dark') {
+          document.documentElement.setAttribute('data-theme', saved);
+        }
+      } catch (e) { /* private mode: fall through to the OS preference */ }
+    })();
+  </script>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23a3e635'/><text x='16' y='23' font-size='17' font-family='monospace' font-weight='700' fill='%230e1012' text-anchor='middle'>OD</text></svg>">
+</head>
+<body>
+
+<header class="bar">
+  <button class="brand" data-goto="run" type="button" aria-label="Outreach Desk home">
+    <span class="brand-mark">OD</span>
+    <span class="brand-name">Outreach&nbsp;Desk</span>
+    <span class="brand-ps">PS-3</span>
+  </button>
+
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button class="tab is-active" data-tab="run" role="tab">Draft</button>
+    <button class="tab" data-tab="runs" role="tab">Runs<span class="n" id="tab-runs-n"></span></button>
+    <button class="tab" data-tab="cases" role="tab">Scenarios<span class="n" id="tab-cases-n"></span></button>
+    <button class="tab" data-tab="policy" role="tab">Policy</button>
+    <button class="tab" data-tab="how" role="tab">How it works</button>
+  </nav>
+
+  <div class="bar-right">
+    <button class="kbar" id="cmd-btn" type="button" aria-label="Open the command bar">
+      <span>Jump to…</span><span class="kbd">Ctrl K</span>
+    </button>
+    <button class="status" id="env-btn" type="button" aria-expanded="false">
+      <span class="dot" id="env-dot"></span><span id="env-label">checking</span>
+    </button>
+    <button class="icon-btn" id="theme-btn" type="button" aria-label="Switch theme"
+            title="Switch theme">◐</button>
+    <div class="pop" id="env-pop" hidden></div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ==================================================== DRAFT ========= -->
+  <section class="panel is-active" id="panel-run">
+
+    <!-- State 1: nothing running. The prospect form is the page. -->
+    <div class="intake" id="run-intake">
+      <div class="intake-head">
+        <span class="lbl">prospect → draft</span>
+        <h2 class="intake-h">Draft outreach</h2>
+        <p class="intake-sub">Name a prospect. The process researches them against live sources,
+           picks the one signal worth mentioning, writes a short email, and audits every claim in
+           it against a real source before a person ever sees it.</p>
+      </div>
+
+      <form class="intake-form" id="run-form" autocomplete="off">
+        <div class="field-grid">
+          <label class="field field-wide">
+            <span class="field-k">Prospect name <span class="req">*</span></span>
+            <input class="input" id="f-name" type="text" required placeholder="Harshil Mathur">
+            <span class="field-h">Who the email is addressed to. Stage 2 checks they still hold
+               the seat before anything is drafted.</span>
+          </label>
+
+          <label class="field">
+            <span class="field-k">Company <span class="req">*</span></span>
+            <input class="input" id="f-company" type="text" required placeholder="Razorpay">
+            <span class="field-h">What the company-level harvest searches on.</span>
+          </label>
+
+          <label class="field">
+            <span class="field-k">Domain</span>
+            <input class="input" id="f-domain" type="text" placeholder="razorpay.com">
+            <span class="field-h">Optional. Raises the source-quality score of anything published
+               on it.</span>
+          </label>
+
+          <label class="field">
+            <span class="field-k">Role or title</span>
+            <input class="input" id="f-role" type="text" placeholder="VP Finance">
+            <span class="field-h">Decides which weight table scores the hook — the reason a CFO
+               and a VP Engineering get different openers from the same news.</span>
+          </label>
+
+          <label class="field">
+            <span class="field-k">Rep notes</span>
+            <input class="input" id="f-notes" type="text" placeholder="Inbound from a payments webinar">
+            <span class="field-h">Context the rep already has. Never used as a factual claim.</span>
+          </label>
+
+          <div class="field field-wide">
+            <span class="field-k">Signal sources</span>
+            <div class="seg" id="mode-seg">
+              <button type="button" data-mode="auto" class="is-on">Auto</button>
+              <button type="button" data-mode="live">Live only</button>
+              <button type="button" data-mode="replay">Replay</button>
+            </div>
+            <span class="field-h" id="mode-help"></span>
+          </div>
+        </div>
+
+        <div class="form-foot">
+          <span class="role-read" id="role-read">scored under <b>default</b> weights</span>
+          <span class="spacer"></span>
+          <p class="form-note">Nothing is ever sent. Approving a draft records that a human
+             cleared it for the rep's own sending tool.</p>
+          <button class="btn btn-primary btn-lg" id="run-btn" type="submit">Research &amp; draft</button>
+        </div>
+      </form>
+
+      <div class="try">
+        <div class="try-rule"><span>or run a prepared case</span></div>
+        <div id="scenario-groups"></div>
+      </div>
+    </div>
+
+    <!-- State 2: running, then the answer. -->
+    <div class="result" id="run-result" hidden>
+
+      <div class="result-bar">
+        <button class="btn" id="back-btn" type="button">&larr; New prospect</button>
+        <div class="result-who" id="run-who">—</div>
+        <div class="result-actions">
+          <button class="btn btn-sm" id="replay-btn" type="button">Re-run</button>
+          <button class="btn btn-sm" id="open-review-btn" type="button" hidden>Open review</button>
+        </div>
+      </div>
+
+      <!-- Only present for a prepared case: what it was built to demonstrate,
+           so the outcome can be read against a stated expectation. -->
+      <div class="intent" id="run-intent" hidden></div>
+
+      <!-- Named phases, not bytes, so a slow stage never reads as a stall. -->
+      <ol class="tracker" id="tracker" aria-label="Processing stages"></ol>
+
+      <p class="now" id="now-doing" hidden></p>
+
+      <!-- The nine stages as they happen. First on the page rather than folded
+           away at the bottom: watching the work is the point of this view. -->
+      <section class="story" id="run-story" hidden>
+        <div class="story-head">
+          <button class="story-toggle" id="story-toggle" type="button"
+                  aria-expanded="true" aria-controls="story-body">
+            <svg class="story-caret" viewBox="0 0 12 8" width="11" height="7" aria-hidden="true">
+              <path d="M1 1.5 6 6.5 11 1.5" fill="none" stroke="currentColor"
+                    stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>
+              <span class="story-h">How this prospect is being worked</span>
+              <span class="story-sub">
+                <span class="story-sub-open">Nine stages, in order, with what each one found.</span>
+                <span class="story-sub-shut" id="story-summary"></span>
+              </span>
+            </span>
+          </button>
+          <div class="story-right">
+            <div class="run-meta" id="run-meta"></div>
+            <button class="btn btn-sm" id="expand-btn" type="button">Expand all</button>
+          </div>
+        </div>
+        <div class="story-body" id="story-body">
+          <ol class="timeline" id="timeline"></ol>
+        </div>
+      </section>
+
+      <div class="verdict" id="verdict" hidden></div>
+
+      <!-- The draft beside the evidence it stands on. -->
+      <div class="panes" id="run-panes" hidden>
+        <div class="pane-stack" id="pane-draft"></div>
+        <div class="pane-stack" id="pane-evidence"></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===================================================== RUNS =========
+       History, the figures across every run, and the drafts still waiting on
+       a person - one page, because they are one question: what has this thing
+       done, and what does it need from me.
+       ==================================================================== -->
+  <section class="panel" id="panel-runs">
+    <div class="head">
+      <div class="head-text">
+        <span class="lbl">history &amp; review</span>
+        <h2>Runs</h2>
+        <p>Every prospect the process has worked, what it decided, and which drafts are still
+           waiting on a person. Open any row to replay its nine stages.</p>
+      </div>
+      <div class="head-cta">
+        <button class="btn btn-primary" data-goto="run" type="button">Draft outreach</button>
+        <button class="btn" id="runs-refresh" type="button">Refresh</button>
+      </div>
+    </div>
+
+    <div class="tiles" id="tiles"></div>
+
+    <div class="charts" id="charts"></div>
+
+    <div class="strip" id="connectors-strip"></div>
+
+    <div class="table-head">
+      <h2>Waiting on a person</h2>
+      <div class="filters" id="queue-filters">
+        <button class="chip is-active" data-qfilter="pending">Pending</button>
+        <button class="chip" data-qfilter="decided">Decided</button>
+        <button class="chip" data-qfilter="nodraft">No draft</button>
+        <button class="chip" data-qfilter="ALL">All</button>
+      </div>
+    </div>
+    <div class="queue" id="queue"></div>
+    <p class="empty-note" id="queue-empty" hidden>Nothing here.</p>
+
+    <div class="table-head" style="margin-top:26px">
+      <h2>Every run</h2>
+      <div class="table-controls">
+        <input class="search" id="runs-search" type="search" autocomplete="off"
+               placeholder="Search prospect, company or case" aria-label="Search runs">
+        <div class="filters" id="runs-filters">
+          <button class="chip is-active" data-filter="ALL">All</button>
+          <button class="chip" data-filter="READY">Ready</button>
+          <button class="chip" data-filter="HUMAN">Needs a human</button>
+          <button class="chip" data-filter="BLOCKED">Blocked</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="grid" id="runs-table">
+        <thead><tr>
+          <th data-sort="created_at">When</th>
+          <th data-sort="prospect_name">Prospect</th>
+          <th data-sort="case_id">Case</th>
+          <th data-sort="status">Outcome</th>
+          <th data-sort="confidence" class="num">Confidence</th>
+          <th data-sort="review_state">Review</th>
+          <th data-sort="source_mode">Sources</th>
+          <th data-sort="ms" class="num">Time</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+      <p class="empty-note" id="runs-empty" hidden>No runs match this filter.</p>
+    </div>
+
+    <div class="card-actions">
+      <button class="btn btn-sm btn-danger" id="runs-clear" type="button">Clear run history</button>
+      <span class="hint">Resetting between takes keeps this readable on video.</span>
+    </div>
+  </section>
+
+  <!-- ================================================== SCENARIOS ======= -->
+  <section class="panel" id="panel-cases">
+    <div class="head">
+      <div class="head-text">
+        <span class="lbl">the test library</span>
+        <h2>The cases this was built against</h2>
+        <p>Five happy paths and five edge cases. Each one names the outcome it should produce,
+           so a run either meets its stated expectation or visibly does not.</p>
+      </div>
+    </div>
+    <div id="cases-groups"></div>
+  </section>
+
+  <!-- =================================================== POLICY ========= -->
+  <section class="panel" id="panel-policy">
+    <div class="head">
+      <div class="head-text">
+        <span class="lbl">rules &amp; thresholds</span>
+        <h2>What every prospect is judged by</h2>
+        <p>The sources the process reads, the rubric that picks the hook, and the rules it will
+           not break however well a signal scores.</p>
+      </div>
+    </div>
+
+    <div class="srcmap">
+      <article class="src">
+        <div class="src-k">The person</div>
+        <p class="src-d">Whether they still hold the seat the CRM says they do, and whether the
+           name belongs to more than one person.</p>
+        <div class="src-r"><b>stage 2</b> identity &amp; employment check</div>
+      </article>
+      <article class="src">
+        <div class="src-k">Public signal</div>
+        <p class="src-d">News, funding, hiring, leadership moves, product and regulatory filings,
+           retrieved per company and per person.</p>
+        <div class="src-r"><b>stage 3</b> harvest &middot; <b>stage 4</b> interpretation</div>
+      </article>
+      <article class="src">
+        <div class="src-k">The safety screen</div>
+        <p class="src-d">Crisis categories nothing may be built on, and the age past which a
+           signal stops being worth mentioning.</p>
+        <div class="src-r"><b>stage 5</b> safety &amp; recency screen</div>
+      </article>
+      <article class="src">
+        <div class="src-k">The retrieved corpus</div>
+        <p class="src-d">The documents themselves — used again at the end to check that every
+           sentence in the draft traces to one of them.</p>
+        <div class="src-r"><b>stage 8</b> claim grounding &amp; style audit</div>
+      </article>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>The scoring rubric</h2>
+        <span class="spacer"></span>
+        <span class="badge badge-accent">deterministic</span>
+      </div>
+      <p class="hint" style="margin:-8px 0 16px">One hundred points across five components. The
+         model turns evidence into typed claims; it gets no vote on which claim wins.</p>
+      <div class="rubric" id="rubric"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Role relevance weights</h2></div>
+      <p class="hint" style="margin:-8px 0 16px">Served from <code>/api/config</code> — the same
+         table <code>scoring.py</code> applies. The highlighted cell is the hook type that wins
+         for that role family.</p>
+      <div style="overflow-x:auto"><table class="matrix" id="matrix"></table></div>
+      <p class="hint">This is the whole reason a CFO and a VP Engineering at the same company,
+         scored against byte-identical evidence, get different openers.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Guardrails</h2>
+        <span class="spacer"></span>
+        <span class="badge badge-reject">hard vetoes</span>
+      </div>
+      <p class="hint" style="margin:-8px 0 16px">A signal in one of these categories is never
+         referenced, whatever it scores — screened once by keyword, then again by the model over
+         whatever survived.</p>
+      <div class="chips" id="sensitive"></div>
+      <div class="sub">
+        <div class="sub-title">Thresholds</div>
+        <dl class="kv" id="policy-kv"></dl>
+      </div>
+      <div class="note">A missed hook costs one email. A tone-deaf email costs the account, so the
+         screen is deliberately over-eager and says so on the run.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>What each outcome means</h2></div>
+      <p class="hint" style="margin:-8px 0 16px">Seven statuses, each mapping onto one of three
+         things a rep does next.</p>
+      <div class="outcomes" id="outcomes"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Who the rep works for</h2></div>
+      <p class="hint" style="margin:-8px 0 16px">A draft needs a point, not a compliment. This is
+         what the hook gets connected to, and the only thing in the email not drawn from a
+         source.</p>
+      <dl class="kv" id="seller-kv"></dl>
+      <div class="sub">
+        <div class="sub-title">Model chain</div>
+        <div class="chips" id="models"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================== HOW IT WORKS ========
+       Written as a document rather than a feature tour: the sections run in
+       the order the system does, each one a heading, an explanation and the
+       picture of the mechanism it describes. The index is built from these
+       headings at runtime, so it can never list a section that is not here.
+       ==================================================================== -->
+  <section class="panel" id="panel-how">
+
+    <article class="doc">
+
+      <header class="doc-head">
+        <p class="doc-kicker">Documentation</p>
+        <h1>How this system works</h1>
+        <p class="doc-lead">A rep names a prospect, and somebody has to decide what is worth
+           saying to them and whether it is true. This is what happens in between.</p>
+        <p class="doc-claim"><b>The model reads and writes. The code decides.</b> Which hook wins
+           is arithmetic, not a judgement call, so the same evidence always picks the same hook
+           and a rep can audit the margin.</p>
+      </header>
+
+      <!-- 1 -->
+      <section class="doc-sec" id="doc-problem">
+        <h2>1. The problem</h2>
+        <p>An SDR working a list of 200 prospects cannot spend twenty minutes on each. So they
+           don't: the company name goes in a template and the reply rate reflects it. But the
+           signal is there — a funding round, a new finance hire, a product launch, a regulatory
+           filing. The work being automated here is <b>finding it, judging whether it matters to
+           this particular person, and turning it into two sentences worth reading</b>.</p>
+        <p>Three questions have to be answered before a word is written, and no single source
+           answers any of them: <b>is this person still there</b>, <b>is there anything real to
+           say</b>, and <b>is it safe and recent enough to say it?</b></p>
+
+        <div data-uml="decides"></div>
+
+        <h3>Three kinds of answer, not one</h3>
+        <div class="how-three">
+          <div class="how-out is-approve">
+            <b>A draft</b>
+            <span>Every factual sentence traces to a retrieved source. A rep reads it and
+               sends it.</span>
+          </div>
+          <div class="how-out is-flag">
+            <b>Work for a human</b>
+            <span>Nothing citable, or the record is wrong, or the name is ambiguous. The
+               process says which, and stops.</span>
+          </div>
+          <div class="how-out is-reject">
+            <b>Nothing at all</b>
+            <span>Every available hook was a crisis story. No email is drafted, deliberately.</span>
+          </div>
+        </div>
+        <p class="how-limits">A process that returns nothing on 3 of 10 prospects and is right
+           every time it does return something is worth more to a rep than one that always
+           returns something.</p>
+      </section>
+
+      <!-- 2 -->
+      <section class="doc-sec" id="doc-stages">
+        <h2>2. The nine stages</h2>
+        <p>Every prospect takes the same nine stages in the same order. Watch them happen on the
+           <button class="linkish" data-goto="run" type="button">Draft</button> page — each one
+           says what it is doing, then what it found.</p>
+
+        <div data-uml="stages"></div>
+
+        <p>A failure is then attributable to one stage rather than to "the system". Five of them
+           can end a run before a draft exists: the identity check halts outright, and the
+           harvest, interpretation, screen and scoring stages each stop if the thing they are
+           looking for is not there. Everything after a stop is marked <b>skipped</b>, not
+           failed, because the work was deliberately not done.</p>
+      </section>
+
+      <!-- 3 -->
+      <section class="doc-sec" id="doc-identity">
+        <h2>3. Why the identity check runs first</h2>
+        <p>Drafting on a bad record is not merely wasted work — it is the specific mistake that
+           burns an account. So the person-level lookups run <b>before</b> the full company
+           harvest, and a confident "they left" or "there are two of them" stops the run there.</p>
+        <p>The probe searches unscoped for joining and departure language, which reliably
+           surfaces unrelated namesakes, so a halt is held to a high bar: a confident verdict
+           that cites a specific retrieved source. Anything weaker degrades to a warning and the
+           run continues on company-level hooks. Telling a rep their CRM is wrong is expensive,
+           and being wrong about it is worse.</p>
+
+        <div data-uml="identity"></div>
+      </section>
+
+      <!-- 4 -->
+      <section class="doc-sec" id="doc-scoring">
+        <h2>4. How the hook is chosen</h2>
+        <p>The model's job in stage 4 is narrow: turn retrieved documents into typed claims, each
+           one carrying the source ids it was read from. A claim that cites no retrieved id is
+           discarded rather than kept — which is what makes an invented citation impossible
+           rather than merely unlikely.</p>
+        <p>What survives is then scored on five components out of a hundred, and the arithmetic
+           picks the winner. <b>Role relevance</b> is the component that does the interesting
+           work: the same funding round is worth 25 points to a finance title and 17 to an
+           engineering one.</p>
+
+        <div data-uml="scoring"></div>
+
+        <p>Below the floor — <b>55</b> for a company-level hook, <b>62</b> for a person-level one
+           — nothing is drafted at all. The full table, component by component, is on the
+           <button class="linkish" data-goto="policy" type="button">Policy</button> page and in
+           the scoring stage of every run.</p>
+      </section>
+
+      <!-- 5 -->
+      <section class="doc-sec" id="doc-verify">
+        <h2>5. What stops it inventing things</h2>
+        <p>Writing is the one stage where a model produces prose a human will read, so it is the
+           one stage whose output is audited rather than trusted. Every sentence in the draft is
+           checked back against the evidence that was retrieved; an unsupported sentence triggers
+           a rewrite, and a second failure holds the run for manual research instead of sending
+           something plausible.</p>
+
+        <div data-uml="verify"></div>
+
+        <p>The same applies to the safety screen: sensitivity is never a score, it is a veto.
+           A layoff story is allowed to score on its merits precisely so that the veto is
+           visibly the thing that removes it, rather than the ranking quietly doing it and
+           looking like a guardrail.</p>
+      </section>
+
+      <!-- 6 -->
+      <section class="doc-sec" id="doc-limits">
+        <h2>6. What this does not do</h2>
+        <ul class="doc-list">
+          <li><b>It never sends.</b> There is no mail credential anywhere in the system.
+             Approving a draft records that a human cleared it.</li>
+          <li><b>It does not score the person's seniority or fit.</b> That is list-building, a
+             different job with different inputs.</li>
+          <li><b>It does not write more than one hook.</b> One permitted fact, one short email.
+             A draft that references three things reads as research, not as a note.</li>
+          <li><b>It does not retry a dead connector indefinitely.</b> A throttled or failing
+             source marks its stage as degraded and the run continues with what it has — only a
+             condition that makes the output untrustworthy stops the process.</li>
+        </ul>
+      </section>
+
+    </article>
+  </section>
+
+</main>
+
+<button class="to-top" id="to-top" type="button" aria-label="Back to top">&uarr; <span>Top</span></button>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="tooltip" id="tooltip" hidden></div>
+
+<script src="/uml.js"></script>
+<script src="/how.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

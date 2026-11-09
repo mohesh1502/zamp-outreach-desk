@@ -1,0 +1,13 @@
+.env
+*.db
+*.sqlite3
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
+runs.db
+
+# Zamp's own candidate guide. Theirs to distribute, not mine - the repo is my
+# build, not their hiring material.
+ASA Case Study*.pdf
