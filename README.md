@@ -170,6 +170,39 @@ do not hold.
 - **Live only** — real sources, no fallback. A prospect with no footprint returns nothing.
 - **Replay** — deterministic corpus. Reproducible, works with no network.
 
+## Deploying it
+
+The repo carries a Render blueprint. In the Render dashboard: **New → Blueprint**,
+point it at this repo, and the one field to fill in is `GEMINI_API_KEY`.
+Everything else — Python version, build and start commands, the health check —
+comes from [`render.yaml`](render.yaml).
+
+Deploying by hand instead of by blueprint needs exactly two settings:
+
+```
+Build command:  pip install -r requirements.txt
+Start command:  uvicorn backend.main:app --host 0.0.0.0 --port $PORT --workers 1
+```
+
+Three things about a hosted instance that are worth knowing before a live demo:
+
+**One worker, deliberately.** A run streams its stages over SSE from an
+in-memory channel. A second worker is a second process with its own channels,
+and a browser that connects to the wrong one watches a run that never
+progresses. Scale by instance, never by worker, unless that buffer moves to
+Redis first.
+
+**The free filesystem is ephemeral.** `runs.db` is wiped on every deploy and
+every restart, so the history starts empty — rebuild it by running the prepared
+cases, which takes a couple of minutes. To keep it, uncomment the disk block in
+`render.yaml`, which also sets `DB_PATH`; that needs a paid instance.
+
+**A free instance sleeps after 15 minutes idle** and takes roughly 50 seconds to
+wake. Open the URL a few minutes before anyone is watching.
+
+Everything else travels: there is no build step, no CDN at render time, and the
+typeface is served from `/fonts` by the app itself.
+
 ## Layout
 
 ```
@@ -184,6 +217,7 @@ backend/
   store.py       SQLite run history
   main.py        API + SSE
   llm.py         Gemini REST client with a model fallback chain
+render.yaml    the deployment blueprint
 frontend/
   index.html     five panels, one visible at a time
   styles.css     both themes, as tokens; no CDN, no build step

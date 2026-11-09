@@ -45,6 +45,9 @@ def _connect() -> sqlite3.Connection:
 
 
 def init() -> None:
+    # A hosted instance can point DB_PATH at a mounted disk, and the mount is
+    # empty on first boot, so the directory is made rather than assumed.
+    config.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with _LOCK, _connect() as conn:
         conn.executescript(_SCHEMA)
 

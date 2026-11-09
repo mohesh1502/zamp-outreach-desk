@@ -1,0 +1,67 @@
+# Render blueprint - https://render.com/docs/blueprint-spec
+#
+# Deploy from the dashboard with "New > Blueprint", point it at this repo, and
+# the only thing left to fill in is GEMINI_API_KEY (marked sync:false below, so
+# it is never committed).
+#
+# Three details that matter for this particular app:
+#
+#   * One worker, deliberately. A run streams its stages over SSE from an
+#     in-memory channel (backend/main.py). A second worker would be a second
+#     process with its own channels, and a browser that connected to the wrong
+#     one would watch a run that never progresses. Scale by instance, never by
+#     worker, unless the channel buffer moves to Redis first.
+#
+#   * The free instance has an ephemeral filesystem, so runs.db is wiped on
+#     every deploy and every restart. That is fine for a demo - the history is
+#     rebuilt by running the prepared cases - but see the disk block below for
+#     making it survive.
+#
+#   * A free instance sleeps after 15 minutes idle and takes ~50s to wake.
+#     Open the URL a few minutes before a live demo.
+
+services:
+  - type: web
+    name: outreach-desk
+    runtime: python
+    plan: free
+    region: singapore          # closest to the author; oregon/frankfurt also fine
+
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT --workers 1
+
+    # /api/health answers without touching the model or the connectors, so it
+    # stays cheap and never fails the deploy because a news feed is throttled.
+    healthCheckPath: /api/health
+
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.4
+
+      # Set this in the Render dashboard once. Never committed.
+      - key: GEMINI_API_KEY
+        sync: false
+
+      # A fallback chain, not one model: free-tier Gemini returns 503 and 404
+      # often enough that a single model makes a live demo flaky.
+      - key: GEMINI_MODELS
+        value: gemini-flash-lite-latest,gemini-3.1-flash-lite,gemini-flash-latest
+
+      # live | replay | auto. 'auto' tries the real connectors and falls back
+      # to the fixture corpus only when nothing comes back.
+      - key: SOURCE_MODE
+        value: auto
+
+    # ---------------------------------------------------------------------
+    # Persistent run history. Disks need a paid instance type, so this is left
+    # commented out: uncomment both blocks together, change `plan` to starter,
+    # and the SQLite file moves onto the disk instead of the ephemeral layer.
+    #
+    #   - key: DB_PATH
+    #     value: /var/data/runs.db
+    #
+    # disk:
+    #   name: runs
+    #   mountPath: /var/data
+    #   sizeGB: 1
+    # ---------------------------------------------------------------------

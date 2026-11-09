@@ -18,7 +18,11 @@ GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta"
 # live | replay | auto
 SOURCE_MODE = os.getenv("SOURCE_MODE", "auto").strip().lower()
 
-DB_PATH = ROOT / "runs.db"
+# Where the run history lives. Overridable because a hosted instance keeps it
+# somewhere else: on Render the project directory is ephemeral and is wiped on
+# every deploy, so a deployment that wants history to survive mounts a disk and
+# points DB_PATH at it.
+DB_PATH = Path(os.getenv("DB_PATH") or (ROOT / "runs.db"))
 FRONTEND_DIR = ROOT / "frontend"
 
 # --- Policy knobs. These are the numbers an operator would actually argue about,
