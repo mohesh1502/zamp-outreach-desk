@@ -186,76 +186,43 @@
   </section>
 
   <!-- ===================================================== RUNS =========
-       History, the figures across every run, and the drafts still waiting on
-       a person - one page, because they are one question: what has this thing
-       done, and what does it need from me.
+       A worklist beside a reading pane. The question this page answers is
+       "which one do I deal with next", and a list you can walk with the
+       keyboard answers it better than a wall of figures does. Nothing is
+       selected on arrival, so the pane shows the shape of the whole history
+       instead.
        ==================================================================== -->
   <section class="panel" id="panel-runs">
-    <div class="head">
-      <div class="head-text">
-        <span class="lbl">history &amp; review</span>
-        <h2>Runs</h2>
-        <p>Every prospect the process has worked, what it decided, and which drafts are still
-           waiting on a person. Open any row to replay its nine stages.</p>
-      </div>
-      <div class="head-cta">
-        <button class="btn btn-primary" data-goto="run" type="button">Draft outreach</button>
-        <button class="btn" id="runs-refresh" type="button">Refresh</button>
-      </div>
-    </div>
+    <div class="work">
 
-    <div class="tiles" id="tiles"></div>
+      <aside class="work-list">
+        <div class="work-bar">
+          <input class="search" id="runs-search" type="search" autocomplete="off"
+                 placeholder="Search prospect, company or case" aria-label="Search runs">
+          <button class="icon-btn" id="runs-refresh" type="button"
+                  aria-label="Reload" title="Reload">&#8635;</button>
+        </div>
 
-    <div class="charts" id="charts"></div>
-
-    <div class="strip" id="connectors-strip"></div>
-
-    <div class="table-head">
-      <h2>Waiting on a person</h2>
-      <div class="filters" id="queue-filters">
-        <button class="chip is-active" data-qfilter="pending">Pending</button>
-        <button class="chip" data-qfilter="decided">Decided</button>
-        <button class="chip" data-qfilter="nodraft">No draft</button>
-        <button class="chip" data-qfilter="ALL">All</button>
-      </div>
-    </div>
-    <div class="queue" id="queue"></div>
-    <p class="empty-note" id="queue-empty" hidden>Nothing here.</p>
-
-    <div class="table-head" style="margin-top:26px">
-      <h2>Every run</h2>
-      <div class="table-controls">
-        <input class="search" id="runs-search" type="search" autocomplete="off"
-               placeholder="Search prospect, company or case" aria-label="Search runs">
-        <div class="filters" id="runs-filters">
+        <div class="filters work-filters" id="runs-filters">
           <button class="chip is-active" data-filter="ALL">All</button>
+          <button class="chip" data-filter="WAITING">Waiting on you</button>
           <button class="chip" data-filter="READY">Ready</button>
           <button class="chip" data-filter="HUMAN">Needs a human</button>
           <button class="chip" data-filter="BLOCKED">Blocked</button>
         </div>
-      </div>
-    </div>
 
-    <div class="table-wrap">
-      <table class="grid" id="runs-table">
-        <thead><tr>
-          <th data-sort="created_at">When</th>
-          <th data-sort="prospect_name">Prospect</th>
-          <th data-sort="case_id">Case</th>
-          <th data-sort="status">Outcome</th>
-          <th data-sort="confidence" class="num">Confidence</th>
-          <th data-sort="review_state">Review</th>
-          <th data-sort="source_mode">Sources</th>
-          <th data-sort="ms" class="num">Time</th>
-        </tr></thead>
-        <tbody></tbody>
-      </table>
-      <p class="empty-note" id="runs-empty" hidden>No runs match this filter.</p>
-    </div>
+        <div class="work-count" id="runs-count"></div>
 
-    <div class="card-actions">
-      <button class="btn btn-sm btn-danger" id="runs-clear" type="button">Clear run history</button>
-      <span class="hint">Resetting between takes keeps this readable on video.</span>
+        <ol class="rlist" id="runs-list"></ol>
+        <p class="empty-note" id="runs-empty" hidden>No runs match this filter.</p>
+
+        <div class="work-foot">
+          <button class="btn btn-sm btn-danger" id="runs-clear" type="button">Clear history</button>
+          <span class="hint">Resetting between takes keeps this readable on video.</span>
+        </div>
+      </aside>
+
+      <section class="work-main" id="runs-detail"></section>
     </div>
   </section>
 

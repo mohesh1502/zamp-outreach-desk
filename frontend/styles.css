@@ -427,28 +427,6 @@ main { max-width: 1320px; margin: 0 auto; padding: 28px var(--inset) 100px; }
 .kv dd b { color: var(--text); font-weight: 600; }
 
 /* ==========================================================================
-   Readouts
-   ========================================================================== */
-
-.tiles {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(146px, 1fr)); gap: 1px;
-  background: var(--line); border: 1px solid var(--line);
-  border-radius: var(--r-lg); overflow: hidden; margin-bottom: 18px;
-}
-.tile { background: var(--surface); padding: 15px 18px 16px; }
-.tile-label { font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: .13em;
-              text-transform: uppercase; color: var(--text-3); }
-.tile-value { font-size: 27px; font-weight: 600; letter-spacing: -.035em; line-height: 1.1;
-              margin: 8px 0 3px; font-variant-numeric: tabular-nums; }
-.tile-value small { font-size: 14px; font-weight: 500; color: var(--text-3); letter-spacing: 0; }
-.tile-sub { font-size: 11.5px; line-height: 1.45; color: var(--text-3); }
-.tile.is-approve .tile-value { color: var(--ok); }
-.tile.is-flag .tile-value    { color: var(--warn); }
-.tile.is-reject .tile-value  { color: var(--bad); }
-.tiles-sm .tile { padding: 12px 15px 13px; }
-.tiles-sm .tile-value { font-size: 21px; margin: 5px 0 0; }
-
-/* ==========================================================================
    Charts
    ========================================================================== */
 
@@ -508,41 +486,9 @@ main { max-width: 1320px; margin: 0 auto; padding: 28px var(--inset) 100px; }
 }
 .strip-item.is-bad { color: var(--bad); border-color: var(--bad-line); background: var(--bad-bg); }
 
-/* ==========================================================================
-   Tables - dense, mono, no zebra
-   ========================================================================== */
+/* ----- bits the removed table block used to own -------------------------- */
 
-.table-head { display: flex; align-items: center; justify-content: space-between;
-              gap: 12px; margin: 0 0 12px; flex-wrap: wrap; }
-.table-head h2 { font-size: 14px; font-weight: 600; }
-.table-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-
-.table-wrap { background: var(--surface); border: 1px solid var(--line);
-              border-radius: var(--r-lg); overflow-x: auto; }
-table.grid { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-table.grid th {
-  text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 500;
-  letter-spacing: .13em; text-transform: uppercase; color: var(--text-3);
-  padding: 10px 14px; white-space: nowrap; background: var(--surface);
-  border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 1;
-}
-table.grid th[data-sort] { cursor: pointer; user-select: none; }
-table.grid th[data-sort]:hover { color: var(--text); }
-table.grid th.is-sorted { color: var(--accent-text); }
-table.grid th.is-sorted::after { content: ''; display: inline-block; margin-left: 5px;
-                                 border: 3.5px solid transparent; }
-table.grid th.is-sorted[data-dir="desc"]::after { border-top-color: currentColor; }
-table.grid th.is-sorted[data-dir="asc"]::after  { border-bottom-color: currentColor; }
-table.grid td { padding: 9px 14px; border-bottom: 1px solid var(--line);
-                white-space: nowrap; color: var(--text-2); }
-table.grid tbody tr:last-child td { border-bottom: none; }
-table.grid tbody tr.clickable { cursor: pointer; }
-table.grid tbody tr.clickable:hover td { background: var(--raised); }
-table.grid td.wrap { white-space: normal; min-width: 170px; }
-.empty-note { padding: 28px; text-align: center; color: var(--text-3); font-size: 12.5px; margin: 0; }
-
-.who { font-size: 13px; font-weight: 600; color: var(--text); letter-spacing: -.01em; }
-.where { font-family: var(--mono); font-size: 10.5px; color: var(--text-3); margin-top: 3px; }
+.empty-note { padding: 26px; text-align: center; color: var(--text-3); font-size: 12.5px; margin: 0; }
 
 table.mini { width: 100%; border-collapse: collapse; font-size: 12px; }
 table.mini th { text-align: left; font-family: var(--mono); font-size: 10px; letter-spacing: .1em;
@@ -1057,32 +1003,6 @@ body.is-locked { overflow: hidden; }
 .score .claim-cell { max-width: 38ch; white-space: normal; line-height: 1.5; color: var(--text); }
 .score .claim-cell .meta { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 5px; }
 
-/* ==========================================================================
-   The review queue
-   ========================================================================== */
-
-.queue { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
-
-.qcard {
-  display: flex; flex-direction: column; text-align: left; font: inherit; color: var(--text);
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
-  padding: 15px 16px 13px; cursor: pointer;
-  transition: border-color .13s, background .13s;
-}
-.qcard:hover { border-color: var(--accent-line); background: var(--raised); }
-.qcard-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.qcard-who { font-size: 13.5px; font-weight: 600; letter-spacing: -.012em; }
-.qcard-where { font-family: var(--mono); font-size: 10.5px; color: var(--text-3); margin-top: 3px; }
-.qcard-subject { margin: 13px 0 0; font-size: 12.5px; font-weight: 600; line-height: 1.45;
-                 padding-left: 10px; border-left: 2px solid var(--accent-line); }
-.qcard-snip { margin: 9px 0 12px; font-size: 12px; line-height: 1.6; color: var(--text-3); flex: 1;
-              display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.qcard-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px;
-              border-top: 1px solid var(--line); padding-top: 10px;
-              font-family: var(--mono); font-size: 10px; letter-spacing: .04em; color: var(--text-3); }
-.qcard-open { color: var(--text-3); letter-spacing: .1em; text-transform: uppercase; }
-.qcard:hover .qcard-open { color: var(--accent-text); }
-
 /* ----- the slide-over a run opens into ----------------------------------- */
 
 .sheet { position: fixed; inset: 0; z-index: 250; }
@@ -1323,4 +1243,128 @@ body.is-locked { overflow: hidden; }
 @media (max-width: 560px) {
   .tracker { grid-template-columns: repeat(3, 1fr); }
   .result-who { display: none; }
+}
+
+/* ==========================================================================
+   The runs workspace
+
+   A worklist beside a reading pane, each scrolling on its own under a fixed
+   bar. The list is the subject of the page, so it gets a hard edge and a
+   constant width; the pane takes whatever is left.
+   ========================================================================== */
+
+.work {
+  display: grid;
+  grid-template-columns: 364px minmax(0, 1fr);
+  gap: 0;
+  /* Two independent scroll areas, sized to the window rather than to their
+     contents: a worklist that scrolls the whole page away is not a worklist. */
+  height: calc(100vh - var(--bar) - 56px);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+
+.work-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.work-bar { display: flex; gap: 8px; padding: 14px 14px 10px; }
+.work-bar .search { flex: 1; min-width: 0; }
+
+.work-filters { padding: 0 14px 12px; }
+.work-filters .chip { font-size: 10px; padding: 4px 9px; }
+
+.work-count {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 9px 16px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--text-3); background: var(--surface);
+}
+.work-count b { color: var(--text); font-weight: 600; }
+.work-count .sep { color: var(--line-strong); }
+
+.rlist { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; min-height: 0; }
+
+.rrow {
+  display: flex; gap: 11px; width: 100%; text-align: left; font: inherit;
+  background: none; border: 0; border-bottom: 1px solid var(--line);
+  border-left: 2px solid transparent;
+  padding: 11px 14px 12px; cursor: pointer; color: var(--text);
+  transition: background .1s, border-color .1s;
+}
+.rrow:hover { background: var(--raised); }
+.rrow.is-on { background: var(--raised); border-left-color: var(--accent); }
+
+.rrow-mark {
+  flex: none; width: 19px; height: 19px; margin-top: 1px; border-radius: var(--r-sm);
+  display: grid; place-items: center; font-size: 10px; font-weight: 700;
+  background: var(--raised); border: 1px solid var(--line); color: var(--text-3);
+}
+.rrow-mark.is-approve { background: var(--ok-bg);   border-color: var(--ok-line);   color: var(--ok); }
+.rrow-mark.is-flag    { background: var(--warn-bg); border-color: var(--warn-line); color: var(--warn); }
+.rrow-mark.is-reject  { background: var(--bad-bg);  border-color: var(--bad-line);  color: var(--bad); }
+
+.rrow-main { flex: 1; min-width: 0; display: block; }
+.rrow-top { display: flex; align-items: baseline; gap: 8px; }
+.rrow-who { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; letter-spacing: -.012em;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rrow-when { flex: none; font-family: var(--mono); font-size: 10px; color: var(--text-3); }
+.rrow-sub { display: block; margin-top: 2px; font-size: 11.5px; color: var(--text-3);
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.rrow-foot { display: flex; align-items: center; gap: 7px; margin-top: 8px; flex-wrap: wrap; }
+.rrow-status { font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em;
+               text-transform: uppercase; border-radius: var(--r-sm); padding: 2px 6px; }
+.rrow-status.is-approve { color: var(--ok);   background: var(--ok-bg); }
+.rrow-status.is-flag    { color: var(--warn); background: var(--warn-bg); }
+.rrow-status.is-reject  { color: var(--bad);  background: var(--bad-bg); }
+.rrow-case { font-family: var(--mono); font-size: 9.5px; color: var(--text-3);
+             border: 1px solid var(--line); border-radius: var(--r-sm); padding: 1px 5px; }
+.rrow-wait { font-family: var(--mono); font-size: 9.5px; letter-spacing: .06em;
+             color: var(--accent-text); }
+.rrow-conf { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--text-3);
+             font-variant-numeric: tabular-nums; }
+
+.work-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+             padding: 12px 14px; border-top: 1px solid var(--line); background: var(--surface); }
+.work-foot .hint { margin: 0; font-size: 10.5px; flex: 1; min-width: 120px; }
+
+/* ----- the reading pane -------------------------------------------------- */
+
+.work-main { min-width: 0; min-height: 0; overflow-y: auto; padding: 18px 20px 40px; }
+
+.pane-wait { padding: 60px 20px; text-align: center; color: var(--text-3); font-size: 12.5px; }
+
+.pane-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.pane-top .spacer { flex: 1; }
+.pane-who { font-size: 16px; font-weight: 600; letter-spacing: -.022em; }
+.pane-where { font-family: var(--mono); font-size: 10.5px; color: var(--text-3); margin-top: 3px; }
+
+.work-main .panes { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1500px) {
+  .work-main .panes { grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); }
+}
+.work-main .charts { grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); }
+
+/* ----- nothing selected -------------------------------------------------- */
+
+.ov-head { margin-bottom: 20px; }
+.ov-head h3 { font-size: 18px; font-weight: 600; letter-spacing: -.025em; margin-top: 9px; }
+.ov-head p { margin: 10px 0 0; font-size: 13px; line-height: 1.7; color: var(--text-3); max-width: 68ch; }
+.ov-head p b { color: var(--text-2); font-weight: 600; }
+.ov-head .kbd { margin: 0 1px; }
+
+@media (max-width: 1040px) {
+  /* Below this the two columns stop being two columns: the list goes back to
+     full width and the pane follows it down the page. */
+  .work { grid-template-columns: minmax(0, 1fr); height: auto; }
+  .work-list { border-right: 0; border-bottom: 1px solid var(--line); }
+  .rlist { max-height: 420px; }
+  .work-main { overflow: visible; }
 }

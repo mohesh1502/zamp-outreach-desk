@@ -22,6 +22,7 @@ import re
 import urllib.parse
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
+from concurrent.futures import ThreadPoolExecutor
 from typing import Iterable, Optional
 from xml.etree import ElementTree
 
@@ -341,17 +342,25 @@ def dedupe(items: Iterable[Evidence]) -> list[Evidence]:
 
 
 def health() -> dict[str, dict]:
-    """Per-connector liveness for the UI status rail."""
+    """Per-connector liveness for the UI status rail.
+
+    Probed concurrently. Sequentially this was four round-trips to four
+    different hosts, and the slowest of them -- DuckDuckGo, which throttles --
+    set the floor for the whole check.
+    """
     probes = (
         ("google_news", lambda: google_news("Stripe funding", limit=1)),
         ("bing_news", lambda: bing_news("Stripe funding", limit=1)),
         ("duckduckgo", lambda: duckduckgo("Stripe careers", limit=1)),
         ("hackernews", lambda: hackernews("Stripe", limit=1)),
     )
-    report: dict[str, dict] = {}
-    for name, probe in probes:
+
+    def run(item: tuple[str, Any]) -> tuple[str, dict]:
+        name, probe = item
         try:
-            report[name] = {"ok": True, "n": len(probe())}
+            return name, {"ok": True, "n": len(probe())}
         except Exception as exc:
-            report[name] = {"ok": False, "detail": type(exc).__name__}
-    return report
+            return name, {"ok": False, "detail": type(exc).__name__}
+
+    with ThreadPoolExecutor(max_workers=len(probes)) as pool:
+        return dict(pool.map(run, probes))

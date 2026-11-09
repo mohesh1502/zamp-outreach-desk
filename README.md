@@ -18,13 +18,14 @@ Demo script and expected questions: **[DEMO.md](DEMO.md)**.
 | Page | What it is |
 |---|---|
 | **Draft** | The prospect form, then the live run — a nine-phase tracker, a sentence saying what the live stage is doing, and the nine stages as a readable story. Expand any stage for the lookups it ran, the signals it formed, the vetoes it applied and the scoring table. The draft lands beside its hook, its claim ledger and its sources. |
-| **Runs** | History and review in one place, because they answer one question: what has this thing done, and what does it still need from me. The figures across every run, four charts, the drafts still waiting on a person, and a sortable, filterable table. Any row opens the review sheet. |
+| **Runs** | A worklist beside a reading pane. The list is every run, filterable down to the ones waiting on you, and walkable with `j`/`k`. Selecting one fills the pane with that run in full — verdict, editable draft, claim ledger, sources, hook, and the nine stages as they ran. Nothing selected, and the pane shows the shape of the whole history instead: four charts and the connector health. |
 | **Scenarios** | Five happy paths and five edge cases, each naming the outcome it should produce. One click runs any of them. |
 | **Rules & policy** | What every prospect is checked against, the scoring rubric with its live thresholds, the role-weight matrix, the guardrail categories, and what each of the seven outcomes means. |
 | **How it works** | The system written as a document, with five diagrams drawn from the code. For the reader who will never open the Runs page. |
 
 Anywhere in the app, **Ctrl/Cmd+K** opens a command bar that jumps to any page
-or launches any prepared case by name.
+or launches any prepared case by name. On **Runs**, `j`/`k` walk the worklist
+and `esc` drops back to the overview.
 
 ## The interface
 
@@ -169,6 +170,20 @@ do not hold.
 - **Auto** — live connectors, fixture corpus only if live returns nothing.
 - **Live only** — real sources, no fallback. A prospect with no footprint returns nothing.
 - **Replay** — deterministic corpus. Reproducible, works with no network.
+
+## What happens on first paint
+
+Everything the page needs to be usable — the config, the prepared cases, the
+run history — answers from memory or from SQLite, so the app renders in about a
+second. The status rail starts on the shallow health check, which only reports
+whether a key is configured.
+
+The *deep* check is a different thing: it makes a real model call and probes
+four news connectors, which costs several seconds and a slice of the Gemini
+free-tier quota. It used to be awaited before the first paint, which meant
+every page load blocked for 7–17 seconds and spent a model call to draw a
+green dot. It now lands whenever it finishes and updates the rail in place, and
+the four connector probes run concurrently rather than one after another.
 
 ## Deploying it
 

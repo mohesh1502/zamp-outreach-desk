@@ -209,14 +209,12 @@
     openStages: new Set(),
     storyFolded: false,
 
-    /* the dashboard table */
+    /* the runs workspace */
     filter: 'ALL',
     search: '',
-    sortKey: 'created_at',
-    sortDir: 'desc',
-
-    /* the queue */
-    qfilter: 'pending',
+    selected: null,        // the run the reading pane is showing
+    detailRun: null,       // its full record, fetched on selection
+    detailOpenStages: null,
 
     /* the sheet */
     sheetRun: null,
@@ -242,7 +240,7 @@
     $$('.panel').forEach((panel) => panel.classList.toggle('is-active', panel.id === `panel-${tab}`));
     if (location.hash !== `#${tab}`) history.replaceState(null, '', `#${tab}`);
     window.scrollTo({ top: 0, behavior: 'auto' });
-    if (tab === 'runs') loadRuns().then(loadQueue);
+    if (tab === 'runs') { renderRunsPage(); loadRuns(); }
   }
 
   $$('.tab').forEach((link) => {
@@ -305,10 +303,18 @@
     }
   });
 
-  async function loadHealth() {
+  /** The status rail.
+   *
+   *  `deep` probes the model and all four connectors, which costs a real
+   *  model call and several seconds. The first paint therefore asks for the
+   *  shallow version - it answers in milliseconds and says whether a key is
+   *  even configured - and the deep one lands a moment later, unblocked.
+   */
+  async function loadHealth(opts = {}) {
+    const deep = opts.deep !== false;
     let health;
     try {
-      health = await api('/api/health?deep=true');
+      health = await api(`/api/health${deep ? '?deep=true' : ''}`);
     } catch {
       $('#env-dot').className = 'dot dot-bad';
       $('#env-label').textContent = 'offline';
@@ -317,6 +323,14 @@
       return;
     }
     state.health = health;
+
+    /* Shallow: nothing has been probed, so say what is actually known - a key
+       is configured or it is not - and leave the rest to the deep pass. */
+    if (!health.connectors) {
+      $('#env-dot').className = `dot ${health.api_key_present ? '' : 'dot-bad'}`;
+      $('#env-label').textContent = health.api_key_present ? 'checking' : 'no key';
+      return;
+    }
 
     const model = health.model || {};
     const connectors = health.connectors || {};
@@ -1350,10 +1364,15 @@
        </details>` : ''}`);
   }
 
-  /* ==================================================== the dashboard ===
-     One fetch, then every figure, chart and row on the page is computed from
-     the same array. Filtering and sorting are client-side so the charts
-     always describe the whole history rather than the current filter. */
+  /* ==================================================== the runs workspace
+     A worklist beside a reading pane, not a wall of figures above a table.
+     The question this page answers is "which one do I deal with next", and a
+     list you can walk with the keyboard answers it better than a grid of
+     cards does - the same shape every queue-shaped tool converges on.
+
+     Nothing is selected on arrival, and the pane shows the shape of the whole
+     history instead. Select a run and the pane becomes that run, in full,
+     without a dialog on top of the page. */
 
   async function loadRuns(opts = {}) {
     let payload;
@@ -1366,9 +1385,7 @@
     state.runs = payload.runs || [];
     state.stats = payload.stats || {};
     $('#tab-runs-n').textContent = pendingRuns().length || '';
-    renderTiles();
-    renderCharts();
-    renderRunsTable();
+    if ($('#panel-runs').classList.contains('is-active')) renderRunsPage();
   }
 
   const pendingRuns = () => state.runs.filter(
@@ -1380,30 +1397,223 @@
     return out;
   }
 
-  function renderTiles() {
+  /* ----- what the list is showing -------------------------------------- */
+
+  const RUN_FILTERS = {
+    ALL: () => true,
+    WAITING: (r) => HAS_DRAFT.has(r.status) && (r.review_state || 'pending') === 'pending',
+    READY: (r) => FAMILY[r.status] === 'READY',
+    HUMAN: (r) => FAMILY[r.status] === 'HUMAN',
+    BLOCKED: (r) => FAMILY[r.status] === 'BLOCKED',
+  };
+
+  function visibleRuns() {
+    const needle = state.search.trim().toLowerCase();
+    const keep = RUN_FILTERS[state.filter] || RUN_FILTERS.ALL;
+    return state.runs.filter((r) => {
+      if (!keep(r)) return false;
+      if (!needle) return true;
+      return [r.prospect_name, r.company, r.role, r.case_id, r.headline]
+        .some((v) => String(v || '').toLowerCase().includes(needle));
+    });
+  }
+
+  function renderRunsPage() {
+    renderRunsList();
+    renderRunsDetail();
+  }
+
+  function renderRunsList() {
+    const rows = visibleRuns();
+    const s = state.stats || {};
+
+    /* The counters live on the list header rather than in a row of boxes:
+       they are context for what is below them, not the subject of the page. */
+    $('#runs-count').innerHTML = [
+      `<b>${s.total || 0}</b> runs`,
+      `<b>${pendingRuns().length}</b> waiting`,
+      `<b>${s.avg_confidence || 0}%</b> mean confidence`,
+    ].join('<span class="sep">·</span>');
+
+    $('#runs-empty').hidden = rows.length > 0;
+    $('#runs-list').innerHTML = rows.map((r) => {
+      const st = statusOf(r.status);
+      const tone = st.tone === 'idle' ? 'flag' : st.tone;
+      const waiting = HAS_DRAFT.has(r.status) && (r.review_state || 'pending') === 'pending';
+      return `
+        <li>
+          <button class="rrow ${state.selected === r.id ? 'is-on' : ''}" type="button"
+                  data-run="${esc(r.id)}">
+            <span class="rrow-mark is-${tone}">${st.glyph}</span>
+            <span class="rrow-main">
+              <span class="rrow-top">
+                <span class="rrow-who">${esc(r.prospect_name)}</span>
+                <span class="rrow-when">${esc(ago(r.created_at))}</span>
+              </span>
+              <span class="rrow-sub">${esc(r.company)}${r.role ? ` · ${esc(r.role)}` : ''}</span>
+              <span class="rrow-foot">
+                <span class="rrow-status is-${tone}">${esc(st.label)}</span>
+                ${r.case_id ? `<span class="rrow-case">${esc(r.case_id)}</span>` : ''}
+                ${waiting ? '<span class="rrow-wait">waiting on you</span>' : ''}
+                <span class="rrow-conf">${r.confidence || 0}</span>
+              </span>
+            </span>
+          </button>
+        </li>`;
+    }).join('');
+
+    $$('#runs-list [data-run]').forEach((btn) => {
+      btn.addEventListener('click', () => selectRun(btn.dataset.run));
+    });
+  }
+
+  function selectRun(id) {
+    state.selected = id;
+    state.detailRun = null;
+    renderRunsList();
+    renderRunsDetail();
+    const on = $('#runs-list .is-on');
+    if (on) on.scrollIntoView({ block: 'nearest' });
+  }
+
+  /** Walk the list from the keyboard. A worklist you have to point at is a
+   *  worklist nobody works through. */
+  function moveSelection(step) {
+    const rows = visibleRuns();
+    if (!rows.length) return;
+    const at = rows.findIndex((r) => r.id === state.selected);
+    const next = at === -1 ? 0 : Math.max(0, Math.min(rows.length - 1, at + step));
+    selectRun(rows[next].id);
+  }
+
+  document.addEventListener('keydown', (event) => {
+    if (!$('#panel-runs').classList.contains('is-active')) return;
+    if (CMD_STATE.open || $('#sheet')) return;
+    const tag = (event.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea') return;
+    if (event.key === 'ArrowDown' || event.key === 'j') { event.preventDefault(); moveSelection(1); }
+    if (event.key === 'ArrowUp' || event.key === 'k') { event.preventDefault(); moveSelection(-1); }
+    if (event.key === 'Escape' && state.selected) {
+      state.selected = null; renderRunsPage();
+    }
+  });
+
+  /* ----- the pane ------------------------------------------------------- */
+
+  async function renderRunsDetail() {
+    const pane = $('#runs-detail');
+    if (!state.selected) { pane.innerHTML = overview(); wireOverview(); return; }
+
+    if (!state.detailRun || state.detailRun.id !== state.selected) {
+      pane.innerHTML = '<div class="pane-wait">Loading the run…</div>';
+      try {
+        state.detailRun = await api(`/api/runs/${encodeURIComponent(state.selected)}`);
+      } catch (err) {
+        pane.innerHTML = `<div class="pane-wait">${esc(err.message)}</div>`;
+        return;
+      }
+    }
+    if (state.detailRun.id !== state.selected) return;   // a faster click won
+
+    const run = state.detailRun;
+    const st = statusOf(run.status);
+    const chosen = (run.signals || []).find((x) => x.id === run.chosen_signal_id);
+    const byId = Object.fromEntries((run.evidence || []).map((e) => [e.id, e]));
+
+    pane.innerHTML = `
+      <div class="pane-top">
+        <div>
+          <div class="pane-who">${esc(run.prospect.name)}</div>
+          <div class="pane-where">${esc(run.prospect.company)}${run.prospect.role ? ` · ${esc(run.prospect.role)}` : ''}
+            · <span class="mono">${esc(run.id)}</span></div>
+        </div>
+        <span class="spacer"></span>
+        ${run.case_id ? `<span class="badge">${esc(run.case_id)}</span>` : ''}
+        <span class="badge">${esc(run.source_mode || '')}</span>
+        <span class="badge badge-mono">${esc(duration(run.ms))}</span>
+        <button class="icon-btn" id="detail-close" type="button" aria-label="Close">&times;</button>
+      </div>
+
+      <div class="verdict is-${st.tone === 'idle' ? 'flag' : st.tone}">
+        <div class="v-mark">${st.glyph}</div>
+        <div class="v-text">
+          <div class="v-word">${esc(st.label)}</div>
+          <div class="v-line">${esc(run.headline || st.line)}</div>
+          <div class="v-sub">${esc(st.next)}</div>
+        </div>
+        <div class="v-conf"><b>${run.confidence || 0}</b><span>confidence</span></div>
+      </div>
+
+      <div class="panes">
+        <div class="pane-stack" id="detail-draft"></div>
+        <div class="pane-stack" id="detail-side"></div>
+      </div>
+
+      <div class="pane" style="margin-top:16px">
+        <div class="pane-head">The nine stages, as they ran<span class="spacer"></span>
+          <span class="badge badge-mono">${esc(duration(run.ms))}</span></div>
+        <div class="pane-body" style="padding:4px 18px">
+          <ol class="timeline" id="detail-timeline"></ol>
+        </div>
+      </div>`;
+
+    $('#detail-draft').innerHTML = (run.draft ? reviewEditor(run) : paneCard(
+      'No draft was produced', '',
+      `<div class="note note-warn">${esc(run.headline)}</div>
+       ${run.selection_rationale ? `<div class="hint">${esc(run.selection_rationale)}</div>` : ''}
+       <div class="hint">Nothing to approve. The process stopped deliberately rather than writing
+         something it could not source.</div>`))
+      + [claimsPane(run), sourcesPane(run, chosen, byId)].filter(Boolean).join('');
+
+    $('#detail-side').innerHTML = [hookPane(chosen), candidatesPane(run)]
+      .filter(Boolean).join('');
+
+    state.detailOpenStages = state.detailOpenStages || new Set();
+    const drawTimeline = () => {
+      const node = $('#detail-timeline');
+      if (!node) return;
+      node.innerHTML = renderSteps(run.stages || [], state.detailOpenStages, null);
+      wireSteps(node, state.detailOpenStages, drawTimeline);
+    };
+    drawTimeline();
+
+    if (run.draft) wireReview(run, pane);
+    $('#detail-close').addEventListener('click', () => {
+      state.selected = null; renderRunsPage();
+    });
+  }
+
+  /** Nothing selected: the shape of the whole history, which is the other
+   *  thing this page is for. */
+  function overview() {
     const s = state.stats || {};
     const by = s.by_status || {};
     const human = ['fallback_company_signal', 'needs_manual_research',
       'flagged_job_change', 'needs_disambiguation'].reduce((n, k) => n + (by[k] || 0), 0);
-    const blocked = (by.blocked_sensitive || 0) + (by.error || 0);
-
-    const tiles = [
-      ['Prospects worked', s.total || 0, '', 'Every run ever recorded.'],
-      ['Draft ready', by.ready_for_review || 0, 'is-approve', 'Grounded, every claim cited.'],
-      ['Needs a human', human, 'is-flag', 'Stopped, and it says why.'],
-      ['Nothing drafted', blocked, 'is-reject', 'Crisis-only signal, or a failure.'],
-      ['Waiting on you', pendingRuns().length, 'is-flag', 'Drafts held for a person.'],
-      ['Cleared by a person', s.approved || 0, '', 'Approved in the queue below.'],
-      ['Mean confidence', `${s.avg_confidence || 0}<small>%</small>`, '', 'Across settled runs.'],
-      ['Mean run time', `${((s.avg_ms || 0) / 1000).toFixed(1)}<small>s</small>`, '', 'Nine stages, end to end.'],
-    ];
-    $('#tiles').innerHTML = tiles.map(([label, value, cls, sub]) => `
-      <div class="tile ${cls}">
-        <div class="tile-label">${esc(label)}</div>
-        <div class="tile-value">${value}</div>
-        <div class="tile-sub">${esc(sub)}</div>
-      </div>`).join('');
+    return `
+      <div class="ov">
+        <div class="ov-head">
+          <span class="lbl">no run selected</span>
+          <h3>What this desk has done so far</h3>
+          <p>${s.total || 0} prospects worked ·
+             <b>${by.ready_for_review || 0}</b> produced a draft ·
+             <b>${human}</b> were handed back to a person ·
+             <b>${(by.blocked_sensitive || 0) + (by.error || 0)}</b> produced nothing at all.
+             Pick a run on the left to read it, or press <span class="kbd">j</span> /
+             <span class="kbd">k</span> to walk the list.</p>
+        </div>
+        <div class="charts" id="charts"></div>
+        <div class="strip" id="connectors-strip"></div>
+      </div>`;
   }
+
+  function wireOverview() {
+    renderCharts();
+    renderConnectorStrip();
+    bindTooltips($('#runs-detail'));
+  }
+
+  /* ----- the charts ----------------------------------------------------- */
 
   const FAMILY_META = [
     ['READY', 'Draft ready', 'var(--ok)'],
@@ -1465,11 +1675,11 @@
   }
 
   function renderCharts() {
+    const node = $('#charts');
+    if (!node) return;
     const runs = state.runs;
     const total = runs.length;
 
-    /* 1. The outcome mix - three families, because the three things a rep can
-          do next are the only distinction colour is allowed to carry. */
     const famCounts = countBy(runs, (r) => FAMILY[r.status] || 'HUMAN');
     const mix = stackChart(
       'What the process decided',
@@ -1479,20 +1689,16 @@
       'A process that returns nothing a third of the time and is right whenever it does return '
       + 'something is worth more than one that always answers.');
 
-    /* 2. Where runs actually end, by status. One hue, because these are seven
-          values of one thing. */
     const statusCounts = countBy(runs, (r) => r.status);
     const endings = barChart(
       'Where runs end',
       'The seven terminal statuses. The four in the middle are all "a human finishes this".',
-      Object.keys(STATUS).filter((k) => statusCounts[k])
-        .map((k) => ({
-          label: statusOf(k).label,
-          n: statusCounts[k],
-          cls: `is-${statusOf(k).tone === 'idle' ? 'flag' : statusOf(k).tone}`,
-        })));
+      Object.keys(STATUS).filter((k) => statusCounts[k]).map((k) => ({
+        label: statusOf(k).label,
+        n: statusCounts[k],
+        cls: `is-${statusOf(k).tone === 'idle' ? 'flag' : statusOf(k).tone}`,
+      })));
 
-    /* 3. The human half of the loop. */
     const draftable = runs.filter((r) => HAS_DRAFT.has(r.status));
     const reviewCounts = countBy(draftable, (r) => r.review_state || 'pending');
     const ledger = stackChart(
@@ -1503,7 +1709,6 @@
       'A rejection is as useful a signal as an approval: it says the hook was grounded but not '
       + 'worth sending.');
 
-    /* 4. Confidence, bucketed. A single mean hides the shape. */
     const settled = runs.filter((r) => r.status !== 'running');
     const buckets = [
       ['80–100', (c) => c >= 80], ['60–79', (c) => c >= 60 && c < 80],
@@ -1518,91 +1723,17 @@
         label, n: settled.filter((r) => test(r.confidence || 0)).length,
       })).filter((r) => r.n));
 
-    $('#charts').innerHTML = mix + endings + ledger + spread;
-    bindTooltips($('#charts'));
+    node.innerHTML = mix + endings + ledger + spread;
+    bindTooltips(node);
   }
 
-  /* ----- the runs table -------------------------------------------------- */
-
-  const SORTERS = {
-    created_at: (r) => r.created_at || '',
-    prospect_name: (r) => String(r.prospect_name || '').toLowerCase(),
-    case_id: (r) => String(r.case_id || '').toLowerCase(),
-    status: (r) => statusOf(r.status).label,
-    confidence: (r) => r.confidence || 0,
-    review_state: (r) => r.review_state || '',
-    source_mode: (r) => r.source_mode || '',
-    ms: (r) => r.ms || 0,
-  };
-
-  function visibleRuns() {
-    const needle = state.search.trim().toLowerCase();
-    let rows = state.runs.filter((r) => {
-      if (state.filter !== 'ALL' && (FAMILY[r.status] || 'HUMAN') !== state.filter) return false;
-      if (!needle) return true;
-      return [r.prospect_name, r.company, r.role, r.case_id, r.headline]
-        .some((v) => String(v || '').toLowerCase().includes(needle));
-    });
-    const get = SORTERS[state.sortKey] || SORTERS.created_at;
-    rows = rows.slice().sort((a, b) => {
-      const x = get(a); const y = get(b);
-      if (x === y) return 0;
-      return (x > y ? 1 : -1) * (state.sortDir === 'asc' ? 1 : -1);
-    });
-    return rows;
-  }
-
-  function renderRunsTable() {
-    const rows = visibleRuns();
-    const body = $('#runs-table tbody');
-    $('#runs-empty').hidden = rows.length > 0;
-
-    body.innerHTML = rows.map((r) => `
-      <tr class="clickable" data-run="${esc(r.id)}">
-        <td class="dim">${esc(ago(r.created_at))}</td>
-        <td class="wrap">
-          <div class="who">${esc(r.prospect_name)}</div>
-          <div class="where">${esc(r.company)}${r.role ? ` · ${esc(r.role)}` : ''}</div>
-        </td>
-        <td>${r.case_id ? `<span class="badge badge-mono">${esc(r.case_id)}</span>` : '<span class="dim">—</span>'}</td>
-        <td>${badge(r.status)}</td>
-        <td class="num">${meter(r.confidence || 0)}</td>
-        <td>${HAS_DRAFT.has(r.status) ? reviewBadge(r.review_state) : '<span class="dim">no draft</span>'}</td>
-        <td class="dim">${esc(r.source_mode || '')}</td>
-        <td class="num mono dim">${esc(duration(r.ms))}</td>
-      </tr>`).join('');
-
-    $$('#runs-table th[data-sort]').forEach((th) => {
-      const on = th.dataset.sort === state.sortKey;
-      th.classList.toggle('is-sorted', on);
-      if (on) th.dataset.dir = state.sortDir; else delete th.dataset.dir;
-    });
-
-    $$('#runs-table tbody tr').forEach((tr) => {
-      tr.addEventListener('click', () => openSheet(tr.dataset.run));
-    });
-  }
-
-  $$('#runs-table th[data-sort]').forEach((th) => {
-    th.addEventListener('click', () => {
-      const key = th.dataset.sort;
-      if (state.sortKey === key) {
-        state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
-      } else {
-        state.sortKey = key;
-        /* Text reads better A-Z, numbers and dates biggest-first. */
-        state.sortDir = ['prospect_name', 'case_id', 'status', 'review_state', 'source_mode']
-          .includes(key) ? 'asc' : 'desc';
-      }
-      renderRunsTable();
-    });
-  });
+  /* ----- the controls --------------------------------------------------- */
 
   $$('#runs-filters .chip').forEach((chip) => {
     chip.addEventListener('click', () => {
       state.filter = chip.dataset.filter;
       $$('#runs-filters .chip').forEach((c) => c.classList.toggle('is-active', c === chip));
-      renderRunsTable();
+      renderRunsList();
     });
   });
 
@@ -1610,12 +1741,12 @@
   $('#runs-search').addEventListener('input', (event) => {
     clearTimeout(searchTimer);
     const value = event.target.value;
-    searchTimer = setTimeout(() => { state.search = value; renderRunsTable(); }, 160);
+    searchTimer = setTimeout(() => { state.search = value; renderRunsList(); }, 160);
   });
 
   $('#runs-refresh').addEventListener('click', async () => {
+    state.detailRun = null;
     await loadRuns();
-    loadQueue();
     loadHealth();
     toast('Reloaded');
   });
@@ -1625,81 +1756,12 @@
     try {
       const result = await api('/api/runs', { method: 'DELETE' });
       toast(`${result.deleted} run(s) deleted`);
+      state.selected = null;
+      state.detailRun = null;
       loadRuns();
-      loadQueue();
     } catch (err) {
       toast(err.message, true);
     }
-  });
-
-  /* ==================================================== the review queue =
-     The human half of the loop, and the only page where the drafts are
-     fetched in full: a card has to show the subject line and the opening
-     words, which the summary rows deliberately do not carry. */
-
-  async function loadQueue() {
-    if (!state.runs.length) await loadRuns({ quiet: true });
-
-    const rows = state.runs.filter((r) => {
-      const hasDraft = HAS_DRAFT.has(r.status);
-      const decided = (r.review_state || 'pending') !== 'pending';
-      if (state.qfilter === 'pending') return hasDraft && !decided;
-      if (state.qfilter === 'decided') return hasDraft && decided;
-      if (state.qfilter === 'nodraft') return !hasDraft;
-      return true;
-    }).slice(0, 36);
-
-    $('#queue-empty').hidden = rows.length > 0;
-    $('#queue-empty').textContent = state.qfilter === 'pending'
-      ? 'Nothing is waiting. Every draft the process produced has been decided.'
-      : 'Nothing here.';
-
-    /* Only the drafts need their full record; the rest render from the row. */
-    const detailed = await Promise.all(rows.map(async (r) => {
-      if (!HAS_DRAFT.has(r.status)) return { row: r, run: null };
-      try { return { row: r, run: await api(`/api/runs/${encodeURIComponent(r.id)}`) }; }
-      catch { return { row: r, run: null }; }
-    }));
-
-    $('#queue').innerHTML = detailed.map(({ row, run }) => {
-      const draft = run && run.draft;
-      const chosen = run && (run.signals || []).find((s) => s.id === run.chosen_signal_id);
-      const bad = run ? (run.claim_checks || []).filter((c) => !c.supported).length : 0;
-      return `
-        <button class="qcard" type="button" data-run="${esc(row.id)}">
-          <div class="qcard-top">
-            <div>
-              <div class="qcard-who">${esc(row.prospect_name)}</div>
-              <div class="qcard-where">${esc(row.company)}${row.role ? ` · ${esc(row.role)}` : ''}</div>
-            </div>
-            ${badge(row.status)}
-          </div>
-          ${draft
-            ? `<div class="qcard-subject">${esc(draft.subject || '(no subject)')}</div>
-               <p class="qcard-snip">${esc(draft.body || '')}</p>`
-            : `<p class="qcard-snip" style="margin-top:12px">${esc(row.headline || '')}</p>`}
-          <div class="qcard-foot">
-            <span>
-              ${chosen ? `${esc(chosen.kind)} hook · ${chosen.score.total}/100` : 'no hook'}
-              ${bad ? ` · <b>${bad} unsourced</b>` : ''}
-            </span>
-            <span>${HAS_DRAFT.has(row.status) ? reviewBadge(row.review_state) : ''}
-              <span class="qcard-open">Open &rarr;</span></span>
-          </div>
-        </button>`;
-    }).join('');
-
-    $$('#queue [data-run]').forEach((node) => {
-      node.addEventListener('click', () => openSheet(node.dataset.run));
-    });
-  }
-
-  $$('#queue-filters .chip').forEach((chip) => {
-    chip.addEventListener('click', () => {
-      state.qfilter = chip.dataset.qfilter;
-      $$('#queue-filters .chip').forEach((c) => c.classList.toggle('is-active', c === chip));
-      loadQueue();
-    });
   });
 
   /* ==================================================== the review sheet =
@@ -1836,22 +1898,24 @@
         the draft for the rep's own sending tool.</div>`);
   }
 
-  function wireReview(run) {
-    const body = $('#r-body');
+  function wireReview(run, root) {
+    const scope = root || $('#sheet') || document;
+    const body = $('#r-body', scope);
     body.addEventListener('input', () => {
       const n = words(body.value);
       const over = n > state.config.policy.max_draft_words;
-      $('#r-count').innerHTML = `${n} words${over ? ' — over the limit' : ''}`;
-      $('#r-count').style.color = over ? 'var(--reject)' : '';
+      const counter = $('#r-count', scope);
+      counter.innerHTML = `${n} words${over ? ' — over the limit' : ''}`;
+      counter.style.color = over ? 'var(--bad)' : '';
     });
 
-    $('#r-copy').addEventListener('click', () => {
-      const text = `Subject: ${$('#r-subject').value}\n\n${body.value}`;
+    $('#r-copy', scope).addEventListener('click', () => {
+      const text = `Subject: ${$('#r-subject', scope).value}\n\n${body.value}`;
       if (navigator.clipboard) navigator.clipboard.writeText(text);
       toast('Draft copied to the clipboard');
     });
 
-    $$('#sheet [data-act]').forEach((btn) => {
+    $$('[data-act]', scope).forEach((btn) => {
       btn.addEventListener('click', async () => {
         const stateName = btn.dataset.act;
         btn.disabled = true;
@@ -1860,14 +1924,15 @@
             method: 'POST',
             body: JSON.stringify({
               state: stateName,
-              subject: $('#r-subject').value,
+              subject: $('#r-subject', scope).value,
               body: body.value,
             }),
           });
           toast(`Marked ${stateName}`);
           closeSheet();
           await loadRuns({ quiet: true });
-          if ($('#panel-queue').classList.contains('is-active')) loadQueue();
+          state.detailRun = null;
+          if ($('#panel-runs').classList.contains('is-active')) renderRunsPage();
         } catch (err) {
           toast(err.message, true);
           btn.disabled = false;
@@ -2039,7 +2104,7 @@
     });
     out.push({
       kind: 'action', hint: 'action', label: 'Reload runs and connector health',
-      run: () => { loadRuns(); loadQueue(); loadHealth(); toast('Reloaded'); },
+      run: () => { state.detailRun = null; loadRuns(); loadHealth(); toast('Reloaded'); },
     });
     return out;
   }
@@ -2154,10 +2219,15 @@
     await Promise.all([
       loadCases().catch(() => toast('Could not load the test library', true)),
       loadRuns({ quiet: true }),
-      loadHealth(),
+      loadHealth({ deep: false }),
     ]);
 
     showTab(location.hash.replace('#', '') || 'run');
+
+    /* Everything above answers from memory or SQLite, so the page is usable
+       immediately. The deep probe - a model call and four connector round
+       trips - updates the rail whenever it finishes, and is not waited on. */
+    loadHealth();
     setInterval(loadHealth, 120000);
   })();
 })();
